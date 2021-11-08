@@ -1,5 +1,5 @@
-FROM nvidia/cudagl:9.2-devel-ubuntu18.04 as build-anaconda
-MAINTAINER Benjamin Land <benland100@gmail.com>
+FROM nvidia/cudagl:10.1-devel-ubuntu18.04 as build-anaconda
+LABEL Nicholas Ruof <nickruof@uw.edu>
 
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
@@ -12,8 +12,8 @@ RUN ./Anaconda3-2021.05-Linux-x86_64.sh -b -p /opt/anaconda3
 RUN rm Anaconda3-2021.05-Linux-x86_64.sh
 RUN conda install -y -c anaconda boost cmake
 
-FROM nvidia/cudagl:9.2-devel-ubuntu18.04  AS build-root
-MAINTAINER Benjamin Land <benland100@gmail.com>
+FROM nvidia/cudagl:10.1-devel-ubuntu18.04  AS build-root
+LABEL Nicholas Ruof <nickruof@uw.edu>
 
 USER root
 COPY chroma_env.sh /etc/profile.d/
@@ -33,8 +33,8 @@ RUN make -j12
 RUN make install
 RUN rm -rf /opt/root-6.22.02
 
-FROM nvidia/cudagl:9.2-devel-ubuntu18.04  as build-geant4
-MAINTAINER Benjamin Land <benland100@gmail.com>
+FROM nvidia/cudagl:10.1-devel-ubuntu18.04  as build-geant4
+LABEL Nicholas Ruof <nickruof@uw.edu>
 
 USER root
 COPY chroma_env.sh /etc/profile.d/
@@ -67,8 +67,8 @@ RUN make install
 RUN rm -rf /opt/geant4.10.05.p01
 
 
-FROM nvidia/cudagl:9.2-devel-ubuntu18.04
-MAINTAINER Benjamin Land <benland100@gmail.com>
+FROM nvidia/cudagl:10.1-devel-ubuntu18.04
+LABEL Nicholas Ruof <nickruof@uw.edu>
 
 USER root
 COPY chroma_env.sh /etc/profile.d/
@@ -81,6 +81,12 @@ COPY --from=build-root /opt/root /opt/root
 RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
 COPY --from=build-geant4 /opt/geant4 /opt/geant4
 RUN apt-get update && apt-get install -y libgmp-dev libmpfr-dev libgmpxx4ldbl zip unzip patchelf
+RUN pip install numpy matplotlib h5py jupyterlab ipympl jupyterlab_widgets pandas seaborn pyvista tinyDB virtualenvwrapper numba pythreejs panel ipygany ipyvtklink
+RUN apt-get -y install wget npm
+RUN cd /opt && wget https://nodejs.org/dist/v16.13.0/node-v16.13.0.tar.gz && tar -xvf node-v16.13.0.tar.gz && cd node-v16.13.0 && ./configure && make all -j8 && make install
+RUN jupyter labextension install @arbennett/base16-nord && jupyter labextension install jupyterlab-spreadsheet \
+    && jupyter labextension install jupyterlab-drawio
+COPY overrides.json /opt/anaconda3/share/jupyter/lab/settings
 RUN git clone --branch v0.3 https://github.com/PyMesh/PyMesh.git && \
     cd PyMesh && \
     git submodule update --init && \
