@@ -1,5 +1,6 @@
 import os
 import matplotlib.pyplot as plt
+import pyvista as pv
 
 def plot_1D(ax, value, label):
     ax.bar(value, height=1, width=0.01*value)
@@ -36,3 +37,16 @@ def db_visualizer(database, save_name=None, save_path=None, figsize=None):
         if save_path:
             destination = os.path.join(save_path, f"{title}_{save_name}.png")
             plt.savefig(destination)
+
+
+def mesh_visualizer(database, save_name=None, save_path=None):
+    all_entries = database.all()
+    for entry in all_entries:
+        mesh = pv.read(entry["file"])
+        plotter = pv.Plotter(off_screen=True)
+        plotter.add_mesh(mesh)
+        if save_name:
+            if save_path:
+                plotter.show(screenshot=os.path.join(save_path, save_name))
+            else:
+                plotter.show(screenshot=os.path.join(os.getcwd(), save_name))
