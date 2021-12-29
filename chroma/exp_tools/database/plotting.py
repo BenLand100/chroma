@@ -31,8 +31,8 @@ def db_visualizer(database, save_name=None, save_path=None, figsize=None):
                     if isinstance(key_data[0][0], float):
                         plot_2D(ax[i-1], key_data[1], key_data[0], "Wavelength (nm)", key)
                     else:
-                        for data in key_data:
-                            plot_2D(ax[i-1], data[1], data[0], "Wavelength (nm)", key)
+                        for data in key_data[0]:
+                            plot_2D(ax[i-1], data, key_data[1], "Wavelength (nm)", key)
         plt.tight_layout()
         if save_path:
             destination = os.path.join(save_path, f"{title}_{save_name}.png")
