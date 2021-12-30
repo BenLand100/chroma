@@ -45,7 +45,13 @@ class PartBuilder:
 
             solid = Solid(mesh, material1=inner_material, material2=outer_material, surface=surface)
             if entry["detector"] is True:
-                det_id = self.geometry.add_pmt(solid, rotation=entry["rotation"], displacement=entry["displacement"])
+                det_rotation = entry["rotation"]
+                det_displace = entry["displacement"]
+                if det_rotation is None:
+                    det_rotation = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+                if det_displace is None:
+                    det_displace = [0, 0, 0]
+                det_id = self.geometry.add_pmt(solid, rotation=det_rotation, displacement=det_displace)
                 self.solid_dict[det_id["solid_id"]] = {
                     "solid": solid, 
                     "name": entry["mesh"], 
