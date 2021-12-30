@@ -1,4 +1,5 @@
 import os
+import copy
 import matplotlib.pyplot as plt
 import pyvista as pv
 
@@ -39,14 +40,17 @@ def db_visualizer(database, save_name=None, save_path=None, figsize=None):
             plt.savefig(destination)
 
 
-def mesh_visualizer(database, save_name=None, save_path=None):
+def mesh_collect(database, plotter, global_args=None, dict_args=None):
     all_entries = database.all()
+    if global_args is None:
+        global_args = {}
+    if dict_args is None:
+        dict_args = {}
     for entry in all_entries:
         mesh = pv.read(entry["file"])
-        plotter = pv.Plotter(off_screen=True)
-        plotter.add_mesh(mesh)
-        if save_name:
-            if save_path:
-                plotter.show(screenshot=os.path.join(save_path, save_name))
-            else:
-                plotter.show(screenshot=os.path.join(os.getcwd(), save_name))
+        settings = copy.deepcopy(dict_args[entry["name"]])
+        if entry["name"] in dict_args.keys():
+            settings.update(global_args)
+            plotter.add_mesh(mesh, color=entry["color"], **settings)
+        else:
+            plotter.add_mesh(mesh, color=entry["color"], **global_args)
