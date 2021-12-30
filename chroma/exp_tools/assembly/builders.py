@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from numpy.core.arrayprint import dtype_is_implied
 import pyvista as pv
 
 from tinydb import TinyDB, Query
@@ -20,9 +21,14 @@ class PartBuilder:
         self.material_db = material_db
         self.surface_db = surface_db
 
-        self.material_dict = {}
+        self.mesh_dict = {}
+        self.inner_mat_dict = {}
+        self.outer_mat_dict = {}
         self.surface_dict = {}
         self.solid_dict = {}
+        self.detectors = {}
+        self.rotations = {}
+        self.displacements = {}
 
     def build_part(self):
         seeker = Query()
@@ -44,9 +50,31 @@ class PartBuilder:
             else:
                 self.geometry.add_solid(solid, rotation=entry["rotation"], displacement=entry["displacement"])
 
-            self.material_dict[entry["material_in"]["name"]] = inner_material
-            self.surface_dict[entry["surface"]["name"]] = surface
-            self.solid_dict[self.instructions[key]["mesh"]] = {solid}
+            self.mesh_dict[entry["mesh"]] = mesh
+            self.inner_mat_dict[entry["mesh"]] = inner_material
+            self.outer_mat_dict[entry["mesh"]] = outer_material
+            self.surface_dict[entry["mesh"]] = surface
+            self.solid_dict[entry["mesh"]] = {solid}
+            self.detector_dict[entry["mesh"]] = {entry["detector"]}
+            self.rotations[entry["mesh"]] = {entry["rotation"]}
+            self.displacements[entry["mesh"]] = {entry["displacement"]}
+
+    def rebuild_part(self):
+        self.geometry.solids = []
+        self.geometry.solid_rotations = []
+        self.geometry.solid_displacements = []
+        for key, solid in self.solid_dict.items():
+            mesh = self.mesh_dict[key]
+            inner_mat = self.inner_mat_dict[key]
+            outer_mat = self.outer_mat_dict[key]
+            surface = self.surface_dict[key]
+            new_solid = Solid(mesh, material1=inner_mat, material2=outer_mat, surface=surface)
+            if self.detectors["key"]:
+                self.geometry.add_pmt(new_solid, rotation=self.rotations[key], displacement=self.displacements[key])
+            else:
+                self.geometry.add_solid(new_solid, rotation=self.rotations[key], displacement=self.displacements[key])
+            self.solid_dict[key] = new_solid
+            
 
     @staticmethod
     def __assemble_mesh(file_name):
@@ -80,7 +108,8 @@ class PartBuilder:
     def __assemble_surface(surf_dict, instruct_entry):
         surface = Surface()
         for key, value in surf_dict.items():
-            if key == "name": continue
+            if key == "name":
+                surface.name = value
             if key == "reflectance":
                 if isinstance(value, list):
                     surface.set("reflect_diffuse", 
