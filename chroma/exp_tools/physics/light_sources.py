@@ -14,7 +14,7 @@ class LaserSource(Photons):
         self.profile = intensity_profile
         
     def generate_photons(self, rate=None):
-        radial = self._radial_vector()
+        radial = self.__radial_vector()
         random_radius = np.random.uniform(0, self.radius**2, int(self.number))
         angles = np.random.uniform(0, 2*np.pi, int(self.number))
         pol_angles = np.random.uniform(0, 2*np.pi, int(self.number))
@@ -26,19 +26,19 @@ class LaserSource(Photons):
         wavelengths = []
         
         for i, angle in tqdm.tqdm(enumerate(angles), total=len(angles)):
-            rot_matrix = self._rotation_matrix(self.normal, angle)
+            rot_matrix = self.__rotation_matrix(self.normal, angle)
             vector = np.matmul(rot_matrix, radial)
             direction = vector * (np.sin(div_angles[i])/np.cos(div_angles[i])) + self.normal
             direction = direction / np.linalg.norm(direction)
             positions.append(vector*np.sqrt(random_radius[i]) + self.center)
             directions.append(direction)
-            pol_vector = np.matmul(self._rotation_matrix(self.normal, pol_angles[i]), radial)
+            pol_vector = np.matmul(self.__rotation_matrix(self.normal, pol_angles[i]), radial)
             polzs.append(pol_vector)
         
         self.pos = np.array(positions)
         self.dir = np.array(directions)
         self.pol = np.array(polzs)
-        if isinstance(self.profile, float):
+        if isinstance(self.profile, float) or isinstance(self.profile, int):
             self.wavelengths = np.array([self.profile]*int(self.number))
         else:
             self.wavelengths = self.profile.rvs(size=int(self.number))
@@ -51,7 +51,7 @@ class LaserSource(Photons):
             
         super().__init__(self.pos, self.dir, self.pol, self.wavelengths, self.t)
     
-    def _radial_vector(self):
+    def __radial_vector(self):
         zero_locs = np.where(self.normal == 0)[0]
         bottom_rows = [[0, 0, 0], [0, 0, 0]]
         indices = [0, 1, 2]
@@ -72,7 +72,7 @@ class LaserSource(Photons):
         radial = (point - self.center) / np.linalg.norm(point - self.center)
         return radial
     
-    def _rotation_matrix(self, n, theta):
+    def __rotation_matrix(self, n, theta):
         first_row = [np.cos(theta) + n[0]**2*(1-np.cos(theta)), n[0]*n[1]*(1-np.cos(theta))-n[2]*np.sin(theta), n[0]*n[2]*(1-np.cos(theta)) + n[1]*np.sin(theta)]
         second_row = [n[0]*n[1]*(1-np.cos(theta)) + n[2]*np.sin(theta), np.cos(theta) + n[1]**2*(1-np.cos(theta)), n[1]*n[2]*(1-np.cos(theta)) - n[0]*np.sin(theta)]
         third_row = [n[0]*n[2]*(1-np.cos(theta)) - n[1]*np.sin(theta), n[1]*n[2]*(1-np.cos(theta)) + n[0]*np.sin(theta), np.cos(theta) + n[2]**2*(1-np.cos(theta))]

@@ -48,8 +48,8 @@ def mesh_collect(database, plotter, global_args=None, dict_args=None):
         dict_args = {}
     for entry in all_entries:
         mesh = pv.read(entry["file"])
-        settings = copy.deepcopy(dict_args[entry["name"]])
         if entry["name"] in dict_args.keys():
+            settings = copy.deepcopy(dict_args[entry["name"]])
             settings.update(global_args)
             plotter.add_mesh(mesh, color=entry["color"], **settings)
         else:

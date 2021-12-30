@@ -35,7 +35,6 @@ class PartBuilder:
         for key, entry in self.instructions.items():
             mesh_file = self.mesh_db.search(seeker.name == entry["mesh"])[0]["file"]
             mesh = self.__assemble_mesh(mesh_file)
-
             inside_mat_dict = self.material_db.search(seeker.name == entry["material_in"]["name"])[0]
             outside_mat_dict = self.material_db.search(seeker.name == entry["material_out"]["name"])[0]
             surface_dict = self.surface_db.search(seeker.name == entry["surface"]["name"])[0]
@@ -60,7 +59,7 @@ class PartBuilder:
             self.inner_mat_dict[entry["mesh"]] = inner_material
             self.outer_mat_dict[entry["mesh"]] = outer_material
             self.surface_dict[entry["mesh"]] = surface
-            self.detector_dict[entry["mesh"]] = entry["detector"]
+            self.detectors[entry["mesh"]] = entry["detector"]
             self.rotations[entry["mesh"]] = entry["rotation"]
             self.displacements[entry["mesh"]] = entry["displacement"]
 
@@ -86,7 +85,7 @@ class PartBuilder:
             else:
                 solid_id = self.geometry.add_solid(new_solid, rotation=self.rotations[key], 
                                                    displacement=self.displacements[key])
-                self.solid_dict[solid_id] = {"solid": solid, "name": key, "channel": None}
+                self.solid_dict[solid_id] = {"solid": new_solid, "name": key, "channel": None}
             self.solid_dict[key] = new_solid
             
     @staticmethod
@@ -123,6 +122,7 @@ class PartBuilder:
         for key, value in surf_dict.items():
             if key == "name":
                 surface.name = value
+                continue
             if key == "reflectance":
                 if isinstance(value, list):
                     surface.set("reflect_diffuse", 
