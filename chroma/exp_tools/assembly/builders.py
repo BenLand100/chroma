@@ -46,18 +46,23 @@ class PartBuilder:
 
             solid = Solid(mesh, material1=inner_material, material2=outer_material, surface=surface)
             if entry["detector"] is True:
-                self.geometry.add_pmt(solid, rotation=entry["rotation"], displacement=entry["displacement"])
+                det_id = self.geometry.add_pmt(solid, rotation=entry["rotation"], displacement=entry["displacement"])
+                self.solid_dict[det_id["solid_id"]] = {
+                    "solid": solid, 
+                    "name": entry["mesh"], 
+                    "channel": det_id["channel_index"]
+                }
             else:
-                self.geometry.add_solid(solid, rotation=entry["rotation"], displacement=entry["displacement"])
-
+                solid_id = self.geometry.add_solid(solid, rotation=entry["rotation"], displacement=entry["displacement"])
+                self.solid_dict[solid_id] = {"solid": solid, "name": entry["mesh"], "channel": None}
+            
             self.mesh_dict[entry["mesh"]] = mesh
             self.inner_mat_dict[entry["mesh"]] = inner_material
             self.outer_mat_dict[entry["mesh"]] = outer_material
             self.surface_dict[entry["mesh"]] = surface
-            self.solid_dict[entry["mesh"]] = {solid}
-            self.detector_dict[entry["mesh"]] = {entry["detector"]}
-            self.rotations[entry["mesh"]] = {entry["rotation"]}
-            self.displacements[entry["mesh"]] = {entry["displacement"]}
+            self.detector_dict[entry["mesh"]] = entry["detector"]
+            self.rotations[entry["mesh"]] = entry["rotation"]
+            self.displacements[entry["mesh"]] = entry["displacement"]
 
     def rebuild_part(self):
         self.geometry.solids = []
