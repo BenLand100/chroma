@@ -75,7 +75,6 @@ class PartBuilder:
                 self.geometry.add_solid(new_solid, rotation=self.rotations[key], displacement=self.displacements[key])
             self.solid_dict[key] = new_solid
             
-
     @staticmethod
     def __assemble_mesh(file_name):
         mesh_data = pv.read(file_name)
