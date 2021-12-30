@@ -75,9 +75,18 @@ class PartBuilder:
             surface = self.surface_dict[key]
             new_solid = Solid(mesh, material1=inner_mat, material2=outer_mat, surface=surface)
             if self.detectors["key"]:
-                self.geometry.add_pmt(new_solid, rotation=self.rotations[key], displacement=self.displacements[key])
+                det_id = self.geometry.add_pmt(new_solid, 
+                                               rotation=self.rotations[key], 
+                                               displacement=self.displacements[key])
+                self.solid_dict[det_id["solid_id"]] = {
+                    "solid": new_solid, 
+                    "name": key, 
+                    "channel": det_id["channel_index"]
+                }
             else:
-                self.geometry.add_solid(new_solid, rotation=self.rotations[key], displacement=self.displacements[key])
+                solid_id = self.geometry.add_solid(new_solid, rotation=self.rotations[key], 
+                                                   displacement=self.displacements[key])
+                self.solid_dict[solid_id] = {"solid": solid, "name": key, "channel": None}
             self.solid_dict[key] = new_solid
             
     @staticmethod
