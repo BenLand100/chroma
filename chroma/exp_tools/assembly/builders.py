@@ -1,10 +1,12 @@
 import json
+import copy
 import numpy as np
 from numpy.core.arrayprint import dtype_is_implied
 import pyvista as pv
 
 from tinydb import TinyDB, Query
-from chroma.geometry import Material, Surface, Mesh, Solid
+from chroma.detector import Detector
+from chroma.geometry import Material, Surface, Mesh, Solid, Geometry
 from chroma.exp_tools.physics.colors import rgb_surface
 
 
@@ -70,29 +72,35 @@ class PartBuilder:
             self.displacements[entry["mesh"]] = entry["displacement"]
 
     def rebuild_part(self):
-        self.geometry.solids = []
-        self.geometry.solid_rotations = []
-        self.geometry.solid_displacements = []
+        if isinstance(self.geometry, Detector):
+            self.geometry = Detector()
+        else:
+            self.geometry = Geometry()
         for key, solid in self.solid_dict.items():
-            mesh = self.mesh_dict[key]
-            inner_mat = self.inner_mat_dict[key]
-            outer_mat = self.outer_mat_dict[key]
-            surface = self.surface_dict[key]
+            mesh = self.mesh_dict[solid["name"]]
+            inner_mat = copy.deepcopy(self.inner_mat_dict[solid["name"]])
+            outer_mat = copy.deepcopy(self.outer_mat_dict[solid["name"]])
+            surface = copy.deepcopy(self.surface_dict[solid["name"]])
             new_solid = Solid(mesh, material1=inner_mat, material2=outer_mat, surface=surface)
-            if self.detectors["key"]:
+            if self.detectors[solid["name"]]:
+                rotation = self.rotations[solid["name"]]
+                displacement = self.displacements[solid["name"]]
+                if rotation is None:
+                    rotation = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+                if displacement is None:
+                    displacement = [0, 0, 0]
                 det_id = self.geometry.add_pmt(new_solid, 
-                                               rotation=self.rotations[key], 
-                                               displacement=self.displacements[key])
+                                               rotation=rotation, 
+                                               displacement=displacement)
                 self.solid_dict[det_id["solid_id"]] = {
                     "solid": new_solid, 
-                    "name": key, 
+                    "name": solid["name"], 
                     "channel": det_id["channel_index"]
                 }
             else:
-                solid_id = self.geometry.add_solid(new_solid, rotation=self.rotations[key], 
-                                                   displacement=self.displacements[key])
-                self.solid_dict[solid_id] = {"solid": new_solid, "name": key, "channel": None}
-            self.solid_dict[key] = new_solid
+                solid_id = self.geometry.add_solid(new_solid, rotation=self.rotations[solid["name"]], 
+                                                   displacement=self.displacements[solid["name"]])
+                self.solid_dict[solid_id] = {"solid": new_solid, "name": solid["name"], "channel": None}
             
     @staticmethod
     def __assemble_mesh(file_name):

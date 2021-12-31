@@ -40,17 +40,20 @@ def db_visualizer(database, save_name=None, save_path=None, figsize=None):
             plt.savefig(destination)
 
 
-def mesh_collect(database, plotter, global_args=None, dict_args=None):
+def mesh_collect(database, plotter, mesh_names=None, global_args=None, dict_args=None):
     all_entries = database.all()
     if global_args is None:
         global_args = {}
     if dict_args is None:
         dict_args = {}
+    if mesh_names is None:
+        mesh_names = []
     for entry in all_entries:
         mesh = pv.read(entry["file"])
-        if entry["name"] in dict_args.keys():
-            settings = copy.deepcopy(dict_args[entry["name"]])
-            settings.update(global_args)
-            plotter.add_mesh(mesh, color=entry["color"], **settings)
-        else:
-            plotter.add_mesh(mesh, color=entry["color"], **global_args)
+        if (entry["name"] in mesh_names) | (len(mesh_names) == 0):
+            if entry["name"] in dict_args.keys():
+                settings = copy.deepcopy(dict_args[entry["name"]])
+                settings.update(global_args)
+                plotter.add_mesh(mesh, color=entry["color"], **settings)
+            else:
+                plotter.add_mesh(mesh, color=entry["color"], **global_args)
