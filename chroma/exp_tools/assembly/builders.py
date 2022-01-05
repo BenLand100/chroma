@@ -103,7 +103,18 @@ class PartBuilder:
             mesh_name = mesh_entry["name"]
             mesh_file = mesh_entry["file"]
             mesh_color = mesh_entry["color"]
-            file_list.append((mesh_name, mesh_file, mesh_color))
+            displacement = None
+            rotation = None
+            if entry["displacement"] is None:
+                displacement = np.array([0, 0, 0])
+            else:
+                displacement = np.array(entry["displacement"])
+            if entry["rotation"] is None:
+                rotation = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+            else:
+                rotation = np.array(entry["rotation"])
+            file_list.append((mesh_name, mesh_file, mesh_color,
+                              displacement, rotation))
         return file_list
 
     # TODO: test is function is needed
@@ -263,6 +274,12 @@ class ComponentBuilder:
             part_builder = PartBuilder(self.geometry, instructions, 
                                        mesh_db_override, self.material_db, self.surface_db)
             mesh_files = part_builder.return_mesh_files()
+            for file in mesh_files:
+                if comp["displacement"] is not None:
+                    file[3] += np.array(comp["displacement"])
+                if comp["rotation"] is not None:
+                    file[4] = np.array(comp["rotation"]) * file[4]
+
             file_list.extend(mesh_files)
         return file_list
 
