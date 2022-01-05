@@ -36,7 +36,7 @@ class PartBuilder:
         if displacement is None:
             displacement = np.array([0, 0, 0])
         if rotation is None:
-            rotation = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+            rotation = np.identity(3)
         for key, entry in self.instructions.items():
             mesh_file = self.mesh_db.search(seeker.name == entry["mesh"])[0]["file"]
             mesh = self.__assemble_mesh(mesh_file)
@@ -59,7 +59,7 @@ class PartBuilder:
                 det_rotation = entry["rotation"]
                 det_displace = entry["displacement"]
                 if det_rotation is None:
-                    det_rotation = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+                    det_rotation = np.identity(3)
                 if det_displace is None:
                     det_displace = [0, 0, 0]
                 det_rotation = rotation * np.array(det_rotation)
@@ -75,7 +75,7 @@ class PartBuilder:
                 solid_rotate = entry["rotation"]
                 solid_displace = entry["displacement"]
                 if entry["rotation"] is None:
-                    solid_rotate = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+                    solid_rotate = np.identity(3)
                 if entry["displacement"] is None:
                     solid_displace = np.array([0, 0, 0])
                 
@@ -110,7 +110,7 @@ class PartBuilder:
             else:
                 displacement = np.array(entry["displacement"])
             if entry["rotation"] is None:
-                rotation = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+                rotation = np.identity(3)
             else:
                 rotation = np.array(entry["rotation"])
             file_list.append((mesh_name, mesh_file, mesh_color,
@@ -289,8 +289,9 @@ def plot_mesh_files(mesh_file_list, plotter, global_args=None, dict_args=None):
         global_args = []
     if dict_args is None:
         dict_args = []
-    for name, file, color in mesh_file_list:
+    for name, file, color, displace, rotate in mesh_file_list:
         mesh = pv.read(file)
+        mesh.translate(displace, inplace=True)
         if name in dict_args.keys():
             settings = copy.deepcopy(dict_args[name])
             settings.update(global_args)
