@@ -5,6 +5,7 @@ import numpy as np
 import pyvista as pv
 
 from tinydb import TinyDB, Query
+from scipy.spatial.transform import Rotation
 from chroma.geometry import Material, Surface, Mesh, Solid
 from chroma.exp_tools.physics.colors import rgb_surface
 
@@ -31,15 +32,25 @@ class PartBuilder:
         self.rotations = {}
         self.displacements = {}
 
-    def build_part(self, save=True, displacement=None, rotation=None):
+    def build_part(self, save=True, rotation=None, displacement=None):
         seeker = Query()
+        combined_mesh = None
         if displacement is None:
-            displacement = np.array([0, 0, 0])
+            displacement = np.zeros(3)
         if rotation is None:
-            rotation = np.identity(3)
+            rotation = np.zeros(3)
         for key, entry in self.instructions.items():
             mesh_file = self.mesh_db.search(seeker.name == entry["mesh"])[0]["file"]
-            mesh = self.__assemble_mesh(mesh_file)
+            mesh, pv_mesh = self.__assemble_mesh(mesh_file, entry["rotation"], entry["displacement"])
+            if combined_mesh is None:
+                combined_mesh = copy.deepcopy(pv_mesh)
+            else:
+                combined_mesh.merge(pv_mesh, inplace=True)
+        global_center = combined_mesh.center
+        for key, entry in self.instructions.items():
+            mesh_file = self.mesh_db.search(seeker.name == entry["mesh"])[0]["file"]
+            mesh, pv_mesh = self.__assemble_mesh(mesh_file, entry["rotation"], entry["displacement"], 
+                                                 global_center, rotation, displacement)
 
             mat_search_in = self.material_db.search(seeker.name == entry["material_in"]["name"])
             mat_search_out = self.material_db.search(seeker.name == entry["material_out"]["name"])
@@ -56,15 +67,7 @@ class PartBuilder:
 
             solid = Solid(mesh, material1=inner_material, material2=outer_material, surface=surface)
             if entry["detector"] is True:
-                det_rotation = entry["rotation"]
-                det_displace = entry["displacement"]
-                if det_rotation is None:
-                    det_rotation = np.identity(3)
-                if det_displace is None:
-                    det_displace = [0, 0, 0]
-                det_rotation = rotation * np.array(det_rotation)
-                det_displace = displacement + det_displace
-                det_id = self.geometry.add_pmt(solid, rotation=det_rotation, displacement=det_displace)
+                det_id = self.geometry.add_pmt(solid, rotation=np.identity(3), displacement=np.zeros(3))
                 if save:
                     self.solid_dict[det_id["solid_id"]] = {
                         "solid": solid, 
@@ -72,28 +75,27 @@ class PartBuilder:
                         "channel": det_id["channel_index"]
                     }
             else:
-                solid_rotate = entry["rotation"]
-                solid_displace = entry["displacement"]
-                if entry["rotation"] is None:
-                    solid_rotate = np.identity(3)
-                if entry["displacement"] is None:
-                    solid_displace = np.array([0, 0, 0])
-                
-                solid_rotate = rotation * solid_rotate
-                solid_displace = displacement + solid_displace
-
-                solid_id = self.geometry.add_solid(solid, rotation=solid_rotate, displacement=solid_displace)
+                solid_id = self.geometry.add_solid(solid, rotation=np.identity(3), displacement=np.zeros(3))
                 if save:
                     self.solid_dict[solid_id] = {"solid": solid, "name": entry["mesh"], "channel": None}
-            
+
             if save:
-                self.mesh_dict[entry["mesh"]] = mesh
+                self.mesh_dict[entry["mesh"]] = pv_mesh
                 self.inner_mat_dict[entry["mesh"]] = inner_material
                 self.outer_mat_dict[entry["mesh"]] = outer_material
                 self.surface_dict[entry["mesh"]] = surface
                 self.detectors[entry["mesh"]] = entry["detector"]
                 self.rotations[entry["mesh"]] = entry["rotation"]
                 self.displacements[entry["mesh"]] = entry["displacement"]
+
+        if rotation is not None:
+            combined_mesh.rotate_x(rotation[0], point=global_center)
+            combined_mesh.rotate_y(rotation[1], point=global_center)
+            combined_mesh.rotate_z(rotation[2], point=global_center)
+        if displacement is not None:
+            combined_mesh.translate(displacement)
+
+        return combined_mesh, self.solid_dict
 
     def return_mesh_files(self):
         file_list = []
@@ -106,48 +108,16 @@ class PartBuilder:
             displacement = None
             rotation = None
             if entry["displacement"] is None:
-                displacement = np.array([0, 0, 0])
+                displacement = np.zeros(3)
             else:
                 displacement = np.array(entry["displacement"])
             if entry["rotation"] is None:
-                rotation = np.identity(3)
+                rotation = np.zeros(3)
             else:
                 rotation = np.array(entry["rotation"])
             file_list.append((mesh_name, mesh_file, mesh_color,
                               displacement, rotation))
         return file_list
-
-    # TODO: test is function is needed
-    # def rebuild_part(self):
-    #     if isinstance(self.geometry, Detector):
-    #         self.geometry = Detector()
-    #     else:
-    #         self.geometry = Geometry()
-    #     for key, solid in self.solid_dict.items():
-    #         mesh = self.mesh_dict[solid["name"]]
-    #         inner_mat = copy.deepcopy(self.inner_mat_dict[solid["name"]])
-    #         outer_mat = copy.deepcopy(self.outer_mat_dict[solid["name"]])
-    #         surface = copy.deepcopy(self.surface_dict[solid["name"]])
-    #         new_solid = Solid(mesh, material1=inner_mat, material2=outer_mat, surface=surface)
-    #         if self.detectors[solid["name"]]:
-    #             rotation = self.rotations[solid["name"]]
-    #             displacement = self.displacements[solid["name"]]
-    #             if rotation is None:
-    #                 rotation = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-    #             if displacement is None:
-    #                 displacement = [0, 0, 0]
-    #             det_id = self.geometry.add_pmt(new_solid, 
-    #                                            rotation=rotation, 
-    #                                            displacement=displacement)
-    #             self.solid_dict[det_id["solid_id"]] = {
-    #                 "solid": new_solid, 
-    #                 "name": solid["name"], 
-    #                 "channel": det_id["channel_index"]
-    #             }
-    #         else:
-    #             solid_id = self.geometry.add_solid(new_solid, rotation=self.rotations[solid["name"]], 
-    #                                                displacement=self.displacements[solid["name"]])
-    #             self.solid_dict[solid_id] = {"solid": new_solid, "name": solid["name"], "channel": None}
 
     @staticmethod
     def __check_db_search(results, search_value, db_name):
@@ -159,11 +129,26 @@ class PartBuilder:
             return results[0]
             
     @staticmethod
-    def __assemble_mesh(file_name):
+    def __assemble_mesh(file_name, rotation, displacement, global_center=None, global_rot=None, global_dist=None):
         mesh_data = pv.read(file_name)
+        center = mesh_data.center_of_mass
+        if rotation is not None:
+            mesh_data.rotate_x(rotation[0], point=center)
+            mesh_data.rotate_y(rotation[1], point=center)
+            mesh_data.rotate_z(rotation[2], point=center)
+        if displacement is not None:
+            mesh_data.translate(displacement)
+        if global_rot is not None:
+            if global_center is None:
+                global_center = np.zeros(3)
+            mesh_data.rotate_x(global_rot[0], point=global_center)
+            mesh_data.rotate_y(global_rot[1], point=global_center)
+            mesh_data.rotate_z(global_rot[2], point=global_center)
+        if global_dist is not None:
+            mesh_data.translate(global_dist)
         vertices = mesh_data.points
         triangles = mesh_data.faces.reshape(-1, 4)[:, 1:]
-        return Mesh(vertices, triangles)
+        return Mesh(vertices, triangles), mesh_data
 
     @staticmethod
     def __assemble_material(mat_dict, instruct_entry):
@@ -241,8 +226,10 @@ class ComponentBuilder:
         self.surface_db = TinyDB(self.instructions["surface_db"])
         
         self.comp_dict = {}
+        self.all_parts_dict = {}
+        self.all_solids_dict = {}
 
-    def build_components(self, save=True):
+    def build_components(self, save=True, save_all_parts=False):
         for key, comp in self.instructions["components"].items():
             mesh_db_override = self.mesh_db
             instructions = None
@@ -257,9 +244,27 @@ class ComponentBuilder:
                         instructions[key][prop] = attribute
             part_builder = PartBuilder(self.geometry, instructions, 
                                        mesh_db_override, self.material_db, self.surface_db)
-            part_builder.build_part(save, comp["displacement"], comp["rotation"])
+            part_mesh, solid_dict = part_builder.build_part(save, comp["displacement"], comp["rotation"])
             if save:
-                self.comp_dict[comp["name"]] = part_builder
+                self.comp_dict[comp["name"]] = part_mesh
+            if save_all_parts:
+                self.all_parts_dict[comp["name"]] = part_builder.mesh_dict
+                self.all_solids_dict.update(solid_dict)
+
+    def output_mesh_files(self, path, all_mesh=False):
+        if all_mesh:
+            for comp_name, part_dict in self.all_parts_dict.items():
+                for part_name, part_mesh in part_dict.items():
+                    destination = os.path.join(path, comp_name, f"{part_name}.stl")
+                    if not os.path.exists(os.path.join(path, comp_name)):
+                        os.makedirs(os.path.join(path, comp_name))
+                    part_mesh.save(destination)
+        else:
+            for comp_name, comp_mesh in self.comp_dict():
+                destination = os.path.join(path, f"{comp_name}.stl")
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                comp_mesh.save(destination)
 
     def return_mesh_files(self):
         file_list = []
@@ -278,20 +283,34 @@ class ComponentBuilder:
                 if comp["displacement"] is not None:
                     file[3] += np.array(comp["displacement"])
                 if comp["rotation"] is not None:
-                    file[4] = np.array(comp["rotation"]) * file[4]
+                    file[4] += np.array(comp["rotation"])
 
             file_list.extend(mesh_files)
         return file_list
 
 
+    def plot_component_mesh(self, plotter, global_args=None, dict_args=None):
+        if global_args is None:
+            global_args = {}
+        if dict_args is None:
+            dict_args = {}
+        for name, mesh in self.comp_dict.items():
+            if name in dict_args.keys():
+                settings = copy.deepcopy(dict_args[name])
+                settings.update(global_args)
+                plotter.add_mesh(mesh, **settings)
+            else:
+                plotter.add_mesh(mesh, **global_args)
+
+
 def plot_mesh_files(mesh_file_list, plotter, global_args=None, dict_args=None):
     if global_args is None:
-        global_args = []
+        global_args = {}
     if dict_args is None:
-        dict_args = []
+        dict_args = {}
     for name, file, color, displace, rotate in mesh_file_list:
         mesh = pv.read(file)
-        mesh.translate(displace, inplace=True)
+        mesh.translate(displace)
         if name in dict_args.keys():
             settings = copy.deepcopy(dict_args[name])
             settings.update(global_args)
