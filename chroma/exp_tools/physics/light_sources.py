@@ -1,6 +1,18 @@
 import tqdm
 import numpy as np
+from scipy.stats import rv_continuous
 from chroma.event import Photons
+
+
+class IntensityProfile(rv_continuous):
+
+    def __init__(self, values, wavelengths):
+        self.values = values
+        self.wavelengths = wavelengths
+        self.norm_factor = np.trapz(values, x=wavelengths)
+
+    def _pdf(self, x):
+        return self.norm_factor*np.interp(x, self.wavelengths, self.values)
 
 
 class LaserSource(Photons):
@@ -43,9 +55,11 @@ class LaserSource(Photons):
         else:
             self.wavelengths = self.profile.rvs(size=int(self.number))
             
-        if rate:
+        if rate > 0:
             time_spacing = (1 / rate) * 1e9
             self.t = np.arange(0, self.number*time_spacing, time_spacing)
+        elif (rate == 0) | (rate < 0):
+            raise ValueError(f"Photon rate {rate} must be greater than zero!")
         else:
             self.t = None
             
