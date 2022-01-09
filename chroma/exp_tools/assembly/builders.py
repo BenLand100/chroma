@@ -69,15 +69,15 @@ class PartBuilder:
             if entry["detector"] is True:
                 det_id = self.geometry.add_pmt(solid, rotation=np.identity(3), displacement=np.zeros(3))
                 if save:
-                    self.solid_dict[det_id["solid_id"]] = {
+                    self.solid_dict[entry["mesh"]] = {
                         "solid": solid, 
-                        "name": entry["mesh"], 
+                        "solid_id": det_id["solid_id"], 
                         "channel": det_id["channel_index"]
                     }
             else:
                 solid_id = self.geometry.add_solid(solid, rotation=np.identity(3), displacement=np.zeros(3))
                 if save:
-                    self.solid_dict[solid_id] = {"solid": solid, "name": entry["mesh"], "channel": None}
+                    self.solid_dict[entry["mesh"]] = {"solid": solid, "solid_id": solid_id, "channel": None}
 
             if save:
                 self.mesh_dict[entry["mesh"]] = pv_mesh

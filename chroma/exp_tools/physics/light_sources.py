@@ -37,7 +37,7 @@ class LaserSource(Photons):
         polzs = []
         wavelengths = []
         
-        for i, angle in tqdm.tqdm(enumerate(angles), total=len(angles)):
+        for i, angle in enumerate(angles):
             rot_matrix = self.__rotation_matrix(self.normal, angle)
             vector = np.matmul(rot_matrix, radial)
             direction = vector * (np.sin(div_angles[i])/np.cos(div_angles[i])) + self.normal
