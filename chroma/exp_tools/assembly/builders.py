@@ -5,7 +5,6 @@ import numpy as np
 import pyvista as pv
 
 from tinydb import TinyDB, Query
-from scipy.spatial.transform import Rotation
 from chroma.geometry import Material, Surface, Mesh, Solid
 from chroma.exp_tools.physics.colors import rgb_surface
 
