@@ -266,28 +266,6 @@ class ComponentBuilder:
                     os.makedirs(path)
                 comp_mesh.save(destination)
 
-    def return_mesh_files(self):
-        file_list = []
-        for key, comp in self.instructions["components"].items():
-            mesh_db_override = self.mesh_db
-            instructions = None
-            if "mesh_db" in comp.keys():
-                mesh_db_override = comp["mesh_db"]
-            part_instructs = os.path.join(self.instructions["parts_path"], comp["file"])
-            with open(part_instructs, "r") as json_file:
-                instructions = json.load(json_file)
-            part_builder = PartBuilder(self.geometry, instructions, 
-                                       mesh_db_override, self.material_db, self.surface_db)
-            mesh_files = part_builder.return_mesh_files()
-            for file in mesh_files:
-                if comp["displacement"] is not None:
-                    file[3] += np.array(comp["displacement"])
-                if comp["rotation"] is not None:
-                    file[4] += np.array(comp["rotation"])
-
-            file_list.extend(mesh_files)
-        return file_list
-
 
     def plot_component_mesh(self, plotter, global_args=None, dict_args=None):
         if global_args is None:
@@ -296,24 +274,8 @@ class ComponentBuilder:
             dict_args = {}
         for name, mesh in self.comp_dict.items():
             if name in dict_args.keys():
-                settings = copy.deepcopy(dict_args[name])
-                settings.update(global_args)
+                settings = global_args
+                settings.update(dict_args[name])
                 plotter.add_mesh(mesh, **settings)
             else:
                 plotter.add_mesh(mesh, **global_args)
-
-
-def plot_mesh_files(mesh_file_list, plotter, global_args=None, dict_args=None):
-    if global_args is None:
-        global_args = {}
-    if dict_args is None:
-        dict_args = {}
-    for name, file, color, displace, rotate in mesh_file_list:
-        mesh = pv.read(file)
-        mesh.translate(displace)
-        if name in dict_args.keys():
-            settings = copy.deepcopy(dict_args[name])
-            settings.update(global_args)
-            plotter.add_mesh(mesh, color=color, **settings)
-        else:
-            plotter.add_mesh(mesh, color=color, **global_args)
