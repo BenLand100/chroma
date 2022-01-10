@@ -54,14 +54,15 @@ class LaserSource(Photons):
             self.wavelengths = np.array([self.profile]*int(self.number))
         else:
             self.wavelengths = self.profile.rvs(size=int(self.number))
-            
-        if rate > 0:
-            time_spacing = (1 / rate) * 1e9
-            self.t = np.arange(0, self.number*time_spacing, time_spacing)
-        elif (rate == 0) | (rate < 0):
-            raise ValueError(f"Photon rate {rate} must be greater than zero!")
-        else:
+        if rate is None:
             self.t = None
+        else:    
+            if rate > 0:
+                time_spacing = (1 / rate) * 1e9
+                self.t = np.arange(0, self.number*time_spacing, time_spacing)
+            elif (rate == 0) | (rate < 0):
+                raise ValueError(f"Photon rate {rate} must be greater than zero!")
+        
             
         super().__init__(self.pos, self.dir, self.pol, self.wavelengths, self.t)
     
