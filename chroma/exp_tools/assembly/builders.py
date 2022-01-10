@@ -231,10 +231,13 @@ class ComponentBuilder:
     def build_components(self, save=True, save_all_parts=False):
         for key, comp in self.instructions["components"].items():
             mesh_db_override = self.mesh_db
+            parts_path_override = self.instructions["parts_path"]
             instructions = None
             if "mesh_db" in comp.keys():
                 mesh_db_override = comp["mesh_db"]
-            part_instructs = os.path.join(self.instructions["parts_path"], comp["file"])
+            if "parts_path" in comp.keys():
+                parts_path_override = comp["parts_path"]
+            part_instructs = os.path.join(parts_path_override, comp["file"])
             with open(part_instructs, "r") as json_file:
                 instructions = json.load(json_file)
             if "overrides" in comp.keys():
@@ -264,7 +267,6 @@ class ComponentBuilder:
                 if not os.path.exists(path):
                     os.makedirs(path)
                 comp_mesh.save(destination)
-
 
     def plot_component_mesh(self, plotter, global_args=None, dict_args=None):
         if global_args is None:
