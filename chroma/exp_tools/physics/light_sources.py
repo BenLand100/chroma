@@ -56,7 +56,7 @@ class LaserSource(Photons):
             self.wavelengths = self.profile.rvs(size=int(self.number))
         if rate is None:
             self.t = None
-        else:    
+        else:
             if rate > 0:
                 time_spacing = (1 / rate) * 1e9
                 self.t = np.arange(0, self.number*time_spacing, time_spacing)
