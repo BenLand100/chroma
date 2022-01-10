@@ -65,7 +65,7 @@ class PartBuilder:
             surface = self.__assemble_surface(surface_dict, entry["surface"])
 
             solid = Solid(mesh, material1=inner_material, material2=outer_material, surface=surface)
-            if entry["detector"] is True:
+            if "detect" in entry["surface"].keys():
                 det_id = self.geometry.add_pmt(solid, rotation=np.identity(3), displacement=np.zeros(3))
                 if save:
                     self.solid_dict[entry["mesh"]] = {
