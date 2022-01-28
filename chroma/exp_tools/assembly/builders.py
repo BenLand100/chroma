@@ -44,7 +44,7 @@ class PartBuilder:
             if combined_mesh is None:
                 combined_mesh = copy.deepcopy(pv_mesh)
             else:
-                combined_mesh.merge(pv_mesh, inplace=True)
+                combined_mesh = combined_mesh.merge(pv_mesh)
         global_center = combined_mesh.center
         for key, entry in self.instructions.items():
             mesh_file = self.mesh_db.search(seeker.name == entry["mesh"])[0]["file"]

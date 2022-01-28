@@ -1,5 +1,5 @@
 import numpy as np
-
+import pyvista as pv
 
 def circle_params(points, normal):
     v01 = (points[1] - points[0]) / np.linalg.norm(points[1] - points[0])
@@ -12,3 +12,7 @@ def circle_params(points, normal):
     center = np.linalg.solve(A, b)
     radius = np.linalg.norm(center - points[0])
     return center, radius
+
+
+def convert_to_pyvista(mesh):
+    return pv.make_tri_mesh(mesh.vertices, mesh.triangles)
