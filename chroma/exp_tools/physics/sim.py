@@ -1,3 +1,5 @@
+import pandas as pd
+
 from chroma.gpu.geometry import GPUGeometry
 from chroma.gpu.detector import GPUDetector
 from chroma.gpu.photon import GPUPhotons
@@ -12,9 +14,9 @@ class Simulation(object):
         self.gpu_geometry = None
         self.gpu_photons = None
 
-    def run(self, rng_states, nthreads_per_block=64, max_blocks=1024, reps=1, max_steps=10):
+    def run(self, rng_states, nthreads_per_block=64, max_blocks=1024, reps=1, max_steps=10, timestep=10000):
+        self.gpu_geometry = GPUDetector(self.geometry)
         for rep in range(reps):
-            self.gpu_geometry = GPUDetector(self.geometry)
             if isinstance(self.light_sources, list):
                 light_source_0 = self.light_sources[0]
                 if len(self.light_sources) > 1:
@@ -30,5 +32,28 @@ class Simulation(object):
                     if det not in self.photon_hits.keys():
                         self.photon_hits[det] = hit_photons[hit_photons.channel == channel]
                     else:
+                        hit_photons.t = hit_photons.t + timestep
                         self.photon_hits[det] = self.photon_hits[det] + hit_photons[hit_photons.channel == channel]
+
+
+class SimProcessor(object):
+
+    def __init__(self, simulation, waveform_window, dt=2):
+        self.simulation = simulation
+
+
+def sipm_params(datasheet, bias=None):
+    if bias is None:
+        bias = 28
+
+    sipm_data = pd.read_csv(datasheet)
+    biases = list(sipm_data["bias"])
+    idx = biases.index(bias)
+    result = [
+        sipm_data["gain"][idx],
+        sipm_data["dark_rate"][idx],
+        sipm_data["cross_talk"][idx],
+        sipm_data["afterpulse"][idx]
+    ]
+    return result
         
