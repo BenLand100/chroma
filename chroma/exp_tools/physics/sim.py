@@ -41,19 +41,71 @@ class SimProcessor(object):
     def __init__(self, simulation, waveform_window, dt=2):
         self.simulation = simulation
 
+        self.proc_list = []
+        self.outputs = {}
+        self.save_to_file = []
+        self.settings = {}
 
-def sipm_params(datasheet, bias=None):
-    if bias is None:
-        bias = 28
+    def process(self):
+        for processor in self.proc_list:
+            if isinstance(processor, SimProcessorBase):
+                processor.process_block(self.outputs)
+            else:
+                raise TypeError("Couldn't identify processor type!")
+        return {key: self.outputs[key] for key in self.save_to_file}
 
-    sipm_data = pd.read_csv(datasheet)
-    biases = list(sipm_data["bias"])
-    idx = biases.index(bias)
-    result = [
-        sipm_data["gain"][idx],
-        sipm_data["dark_rate"][idx],
-        sipm_data["cross_talk"][idx],
-        sipm_data["afterpulse"][idx]
-    ]
-    return result
-        
+    def add(self, fun_name, settings):
+        if settings is None:
+            settings = {}
+        if fun_name in self.settings:
+            self.settings[fun_name] = {**self.settings[fun_name], **settings}
+        else:
+            self.settings[fun_name] = settings
+        if fun_name in dir(pc):
+            self.proc_list.append(
+                SimProcessorBase(getattr(pc, fun_name), **self.settings[fun_name]))
+        elif fun_name in dir(pt):
+            self.proc_list.append(
+                SimProcessorBase(getattr(pt, fun_name), **self.settings[fun_name]))
+        else:
+            raise LookupError(f"Unknown function: {fun_name}")
+
+    def init_outputs(self, outputs):
+        self.outputs = outputs
+
+    def add_output(self, key, value):
+        self.outputs[key] = value
+
+    def reset_outputs(self):
+        self.outputs.clear()
+
+    def add_to_file(self, var_name):
+        if isinstance(var_name, str):
+            if var_name not in self.save_to_file:
+                self.save_to_file.append(var_name)
+        elif isinstance(var_name, list):
+            self.save_to_file += var_name
+        else:
+            raise TypeError(f"var_name of type {type(var_name)} must be str or list of strings")
+
+    def clear(self):
+        self.proc_list.clear()
+        self.settings.clear()
+
+
+class SimProcessorBase(object):
+    def __init__(self, function, **kwargs):
+        self.function = function
+        self.fun_kwargs = kwargs
+
+    def process_block(self, outputs):
+        self.function(outputs, **self.fun_kwargs)
+
+
+def load_functions(proc_settings, processor):
+    for key, params in proc_settings["processes"].items():
+        processor.add(key, settings=params)
+    for output in proc_settings["save_output"]:
+        processor.add_to_file(output)
+    for output in proc_settings["save_waveforms"]:
+        processor.add_to_file(output)
