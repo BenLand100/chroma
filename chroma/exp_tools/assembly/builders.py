@@ -268,6 +268,16 @@ class ComponentBuilder:
                     os.makedirs(path)
                 comp_mesh.save(destination)
 
+    def det_channels(self):
+        detector_parts = {}
+        if self.all_parts_dict == {}:
+            raise AttributeError("All parts dict is empty run the build with save all parts enabled first!")
+        else:
+            for key, entry in enumerate(self.all_parts_dict):
+                if entry["channel"] is not None:
+                    detector_parts[key] = entry["channel"]
+        return detector_parts
+
     def plot_component_mesh(self, plotter, global_args=None, dict_args=None):
         if global_args is None:
             global_args = {}
