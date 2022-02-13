@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
 import math
+import h5py
+import time
 import numpy as np
 
 
@@ -139,3 +141,17 @@ class SiPM:
                 self.waves[i] = np.add(self.waves[i], response_func(self.time, time, amp))
             if noise:
                 self.waves[i] = np.add(self.waves[i], self.__baseline_noise(self.time, fwhm_noise, fwhm_offset))
+
+    def save_waveforms(self, output_path, channel_name=None):
+        if channel_name is None:
+            channel_name = "sipm"
+        with h5py.File(output_path, "w") as h5_file:
+            h5_file.create_dataset(f"/raw/channels/{channel_name}/waveforms", data=self.waves)
+            h5_file.create_dataset(f"/raw/channels/{channel_name}/wf_len", data=self.waves.shape[1])
+            timetags = np.arange(0, self.waves.shape[0]*self.waveform_length, self.waveform_length)
+            if "timetag" not in h5_file.keys():
+                h5_file.create_dataset("timetag", data=timetags)
+            if "dt" not in h5_file.keys():
+                h5_file.create_dataset("dt", data=self.dt)
+            if "date" not in h5_file.keys():
+                h5_file.create_dataset("date", data=time.time())
