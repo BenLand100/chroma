@@ -155,3 +155,17 @@ class SiPM:
                 h5_file.create_dataset("dt", data=self.dt)
             if "date" not in h5_file.keys():
                 h5_file.create_dataset("date", data=time.time())
+
+
+class Photodiode:
+
+    def __init__(self, waveform_length, dt, hit_photons=None):
+        self.waveform_length = waveform_length
+        self.dt = dt
+        self.hit_photons = hit_photons
+        self.waves = None
+        self.time = None
+
+    def init_waves(self, num_waveforms):
+        self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
+        self.time = np.arange(0, int(self.waveform_length), self.dt)

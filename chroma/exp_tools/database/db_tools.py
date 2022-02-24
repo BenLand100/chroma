@@ -4,7 +4,7 @@ from tinydb import TinyDB, Query
 
 
 def mesh_db_template(file_path, db_name, db_path=None):
-    if db_path:
+    if db_path is not None:
         new_db = TinyDB(os.path.join(db_path, db_name), indent=4)
     else:
         new_db = TinyDB(db_name, indent=4)

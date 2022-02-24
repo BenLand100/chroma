@@ -234,7 +234,7 @@ class ComponentBuilder:
             parts_path_override = self.instructions["parts_path"]
             instructions = None
             if "mesh_db" in comp.keys():
-                mesh_db_override = comp["mesh_db"]
+                mesh_db_override = TinyDB(comp["mesh_db"])
             if "parts_path" in comp.keys():
                 parts_path_override = comp["parts_path"]
             part_instructs = os.path.join(parts_path_override, comp["file"])
@@ -246,7 +246,7 @@ class ComponentBuilder:
                         instructions[key][prop] = attribute
             part_builder = PartBuilder(self.geometry, instructions, 
                                        mesh_db_override, self.material_db, self.surface_db)
-            part_mesh, solid_dict = part_builder.build_part(save, comp["displacement"], comp["rotation"])
+            part_mesh, solid_dict = part_builder.build_part(save, comp["rotation"], comp["displacement"])
             if save:
                 self.comp_dict[comp["name"]] = part_mesh
             if save_all_parts:
