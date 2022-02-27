@@ -4,7 +4,7 @@ import math
 import h5py
 import time
 import numpy as np
-
+import scipy.constants as const
 
 def poisson_distro(k, lam):
     if isinstance(k, int):
@@ -169,3 +169,23 @@ class Photodiode:
     def init_waves(self, num_waveforms):
         self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
         self.time = np.arange(0, int(self.waveform_length), self.dt)
+
+    def generate_waveforms(self, reponse=None, noise=True, fwhm_noise=1e-10):
+        if response is None:
+            response = 23
+
+        hit_times = self.hit_photons.t
+        hit_energies = const.h*const.c / self.hit_photons.wavelengths
+        t0 = 0
+        tf = self.waveform_length*self.dt
+        for i, wave in enumerate(self.waves):
+            if noise == True:
+                self.waves[i] += np.random.normal(scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=self.waveform_length)
+            local_hit_times = hit_times[(hit_times >= t0) & (hit_times < tf)]
+            local_hit_energies = hit_energies[(hit_times >= t0) & (hit_times < tf)]
+            if len(local_hit_times) == 0:
+                continue
+            local_current = np.gradient(local_hit_energies) * response
+            self.waves[i] += np.interp(self.time+t0, local_hit_times, local_current)
+            t0 += self.waveform_length*self.dt
+            tf += self.waveform_length*self.dt
