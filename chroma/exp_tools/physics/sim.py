@@ -3,12 +3,34 @@ import pandas as pd
 from chroma.gpu.geometry import GPUGeometry
 from chroma.gpu.detector import GPUDetector
 from chroma.gpu.photon import GPUPhotons
+import chroma.exp_tools.physics.functions as func_dir
 
 import os, time, glob
 import h5py
+import tqdm
 import numpy as np
 
-from SiPMStudio.utils.gen_utils import tqdm_range
+
+def tqdm_range(start, stop, step=1, verbose=True, text=None, bar_length=40, position=0):
+    hide_bar = True
+    if verbose:
+        hide_bar = False
+    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
+
+    return tqdm.trange(start, stop, step, position=position, disable=hide_bar, desc=text, bar_format=bar_format, leave=True)
+
+
+def tqdm_it(iterable, verbose=True, text=None, bar_length=40, position=0, enum=False):
+    hide_bar = True
+    if verbose:
+        hide_bar = False
+    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
+
+    if enum:
+        return tqdm.tqdm(enumerate(iterable), total=len(iterable), position=position, disable=hide_bar, desc=text, bar_format=bar_format, leave=True)
+    else:
+        return tqdm.tqdm(iterable, total=len(iterable), position=position, disable=hide_bar, desc=text, bar_format=bar_format, leave=True)
+
 
 class Simulation(object):
 
@@ -22,7 +44,7 @@ class Simulation(object):
 
     def run(self, rng_states, nthreads_per_block=64, max_blocks=1024, reps=1, max_steps=10, timestep=10000):
         self.gpu_geometry = GPUDetector(self.geometry)
-        for rep in range(reps):
+        for rep in tqdm_it(reps):
             if isinstance(self.light_sources, list):
                 light_source_0 = self.light_sources[0]
                 if len(self.light_sources) > 1:
@@ -67,12 +89,9 @@ class SimProcessor(object):
             self.settings[fun_name] = {**self.settings[fun_name], **settings}
         else:
             self.settings[fun_name] = settings
-        if fun_name in dir(pc):
+        if fun_name in dir(func_dir):
             self.proc_list.append(
-                SimProcessorBase(getattr(pc, fun_name), **self.settings[fun_name]))
-        elif fun_name in dir(pt):
-            self.proc_list.append(
-                SimProcessorBase(getattr(pt, fun_name), **self.settings[fun_name]))
+                SimProcessorBase(getattr(func_dir, fun_name), **self.settings[fun_name]))
         else:
             raise LookupError(f"Unknown function: {fun_name}")
 
@@ -117,15 +136,12 @@ def load_functions(proc_settings, processor):
         processor.add_to_file(output)
 
 
-def process_data(settings, processor, bias=None, overwrite=False, verbose=False, chunk=2000, write_size=1):
+def process_data(input_path, output_path, processor, channels, bias=None, overwrite=False, verbose=False, chunk=2000, write_size=1):
 
-    path = settings["output_path_raw"]
-    path_t2 = settings["output_path_t2"]
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
-    if not os.path.exists(path_t2):
-        os.makedirs(path_t2)
-
-    data_files = glob.glob(f"{path}/*.h5")
+    data_files = glob.glob(f"{input_path}/*.h5")
     data_files.sort()
     output_files = []
     for file in data_files:
@@ -138,8 +154,8 @@ def process_data(settings, processor, bias=None, overwrite=False, verbose=False,
     if verbose:
         print(" ")
         print("Starting Chroma Sim processing ... ")
-        print("Input Path: ", path)
-        print("Output Path: ", path_t2)
+        print("Input Path: ", input_path)
+        print("Output Path: ", output_path)
         print("Input Files: ", data_files)
 
         file_sizes = []
@@ -159,8 +175,8 @@ def process_data(settings, processor, bias=None, overwrite=False, verbose=False,
     # -----Processing Begins Here!---------------------------------
 
     for idx, file in enumerate(data_files):
-        destination = os.path.join(path, file)
-        output_destination = os.path.join(path_t2, output_files[idx])
+        destination = os.path.join(input_path, file)
+        output_destination = os.path.join(output_path, output_files[idx])
         if verbose:
             print(f"Processing: {file}")
         h5_file = h5py.File(destination, "r")
@@ -169,7 +185,7 @@ def process_data(settings, processor, bias=None, overwrite=False, verbose=False,
         data_storage = {"size": 0}
         for i in tqdm_range(0, num_rows//chunk + 1, verbose=verbose):
             begin, end = _chunk_range(i, chunk, num_rows)
-            _initialize_outputs(idx, settings, h5_file, processor, begin, end)
+            _initialize_outputs(h5_file, processor, begin, end)
             output_data = processor.process()
             _output_chunk(h5_output_file, output_data, data_storage, write_size, num_rows, chunk, end)
             processor.reset_outputs()
@@ -192,9 +208,9 @@ def _chunk_range(index, chunk, num_rows):
     return start, stop
 
 
-def _initialize_outputs(idx, settings, h5_file, processor, begin, end):
+def _initialize_outputs(h5_file, processor, begin, end):
     data_dict = {}
-    for channel in settings["init_info"][idx]["channels"]:
+    for channel in h5_file["/raw/channels"].keys():
         data_dict["timetag"] = h5_file["timetag"][begin: end]
         data_dict[f"/raw/channels/{channel}/waveforms"] = h5_file[f"/raw/channels/{channel}/waveforms"][begin: end]
     processor.init_outputs(data_dict)
