@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import math
+from tkinter import Scale
 import h5py
 import time
 import numpy as np
@@ -78,12 +79,6 @@ class DetectorDevice(ABC):
         self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
         self.time = np.arange(0, int(self.waveform_length), self.dt)
 
-    @staticmethod
-    def __baseline_noise(t, fwhm_noise, fwhm_offset):
-        noise = np.random.normal(loc=0, scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=len(t))
-        offset = np.random.normal(loc=0, scale=fwhm_offset/(2*np.sqrt(2*np.log(2))))
-        return noise + offset
-
     def generate_waveforms(self):
         pass
 
@@ -112,6 +107,12 @@ class SiPM(DetectorDevice):
         self.all_amps = []
 
         super(SiPM, self).__init__(waveform_length, dt, hit_photons)
+
+    @staticmethod
+    def __baseline_noise(t, fwhm_noise, fwhm_offset):
+        noise = np.random.normal(loc=0, scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=len(t))
+        offset = np.random.normal(loc=0, scale=fwhm_offset/(2*np.sqrt(2*np.log(2))))
+        return noise + offset
 
     def add_dark_counts(self, sample_size=100, trigger=None):
         for i, waveform in enumerate(self.waves):
@@ -172,23 +173,31 @@ class Photodiode(DetectorDevice):
     def __init__(self, waveform_length, dt, hit_photons=None):
         super(Photodiode, self).__init__(waveform_length, dt, hit_photons)
 
-    def generate_waveforms(self, response=None, noise=True, fwhm_noise=1e-10, fwhm_offset=1e-10):
+    @staticmethod
+    def __baseline_noise(t, fwhm_noise, fwhm_offset):
+        noise = np.random.normal(loc=0, scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=len(t))
+        offset = np.random.normal(loc=0, scale=fwhm_offset/(2*np.sqrt(2*np.log(2))))
+        return noise + offset
+
+    def generate_waveforms(self, response=None, noise=True, fwhm_noise=1e-20, fwhm_offset=0, scale=1e-14):
         if response is None:
             response = 23
         if self.hit_photons is None:
             raise ValueError("No hit_photons specified! Need hit_photons to calculate photocurrent!")
         hit_times = self.hit_photons.t
-        hit_energies = const.h*const.c / self.hit_photons.wavelengths
+        hit_energies = const.h*const.c / (self.hit_photons.wavelengths*1e-9)
         t0 = 0
-        tf = self.waveform_length*self.dt
+        tf = self.waveform_length
         for i, wave in enumerate(self.waves):
             if noise == True:
-                self.wave[i] = self.__baseline_noise(self.time, fwhm_noise, fwhm_offset)
+                self.waves[i] = self.__baseline_noise(self.time, fwhm_noise, fwhm_offset)
             local_hit_times = hit_times[(hit_times >= t0) & (hit_times < tf)]
             local_hit_energies = hit_energies[(hit_times >= t0) & (hit_times < tf)]
+            n, bins_t = np.histogram(local_hit_times, bins=int(self.waveform_length/self.dt), 
+                                     range=[0, int(self.waveform_length)], 
+                                     weights=local_hit_energies)
             if len(local_hit_times) == 0:
                 continue
-            local_current = np.gradient(local_hit_energies) * response
-            self.waves[i] += np.interp(self.time+t0, local_hit_times, local_current)
-            t0 += self.waveform_length*self.dt
-            tf += self.waveform_length*self.dt
+            self.waves[i] += n * response * scale
+            t0 += self.waveform_length
+            tf += self.waveform_length

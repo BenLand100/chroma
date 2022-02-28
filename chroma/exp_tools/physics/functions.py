@@ -4,7 +4,9 @@ import peakutils
 from scipy.optimize import curve_fit
 from functools import partial
 
-from SiPMStudio.processing.functions import gaussian
+
+def gaussian(x, A, mu, sigma):
+    return A*np.exp(-(x-mu)**2/(2*sigma**2))
 
 
 def baseline_subtract(outputs, wf_in, wf_out, degree=1, flip=False):

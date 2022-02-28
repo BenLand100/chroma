@@ -1,8 +1,8 @@
-import pandas as pd
-
 from chroma.gpu.geometry import GPUGeometry
 from chroma.gpu.detector import GPUDetector
 from chroma.gpu.photon import GPUPhotons
+from chroma.gpu.tools import get_rng_states
+
 import chroma.exp_tools.physics.functions as func_dir
 
 import os, time, glob
@@ -42,9 +42,10 @@ class Simulation(object):
         self.gpu_geometry = None
         self.gpu_photons = None
 
-    def run(self, rng_states, nthreads_per_block=64, max_blocks=1024, reps=1, max_steps=10, timestep=10000):
+    def run(self, nthreads_per_block=64, max_blocks=1024, reps=1, max_steps=10, timestep=10000, time_offset=0):
         self.gpu_geometry = GPUDetector(self.geometry)
-        for rep in tqdm_it(reps):
+        rng_states = get_rng_states(nthreads_per_block*max_blocks)
+        for rep in tqdm_range(start=0, stop=reps):
             if isinstance(self.light_sources, list):
                 light_source_0 = self.light_sources[0]
                 if len(self.light_sources) > 1:
@@ -58,10 +59,11 @@ class Simulation(object):
                 hit_photons = self.gpu_photons.get_hits(gpu_detector=self.gpu_geometry)
                 for det, channel in self.det_channel.items():
                     if det not in self.photon_hits.keys():
-                        self.photon_hits[det] = hit_photons[hit_photons.channel == channel]
+                        self.photon_hits[det] = hit_photons[channel][hit_photons[channel].channel == channel]
+                        self.photon_hits[det].t += time_offset
                     else:
-                        hit_photons.t = hit_photons.t + timestep
-                        self.photon_hits[det] = self.photon_hits[det] + hit_photons[hit_photons.channel == channel]
+                        hit_photons[channel].t = hit_photons[channel].t + rep * timestep + time_offset
+                        self.photon_hits[det] = self.photon_hits[det] + hit_photons[channel][hit_photons[channel].channel == channel]
 
 
 class SimProcessor(object):

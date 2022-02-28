@@ -25,7 +25,7 @@ class LaserSource(Photons):
         self.div_angle = (divergence / 180) * np.pi
         self.profile = intensity_profile
         
-    def generate_photons(self, rate=None):
+    def generate_photons(self, time_window=None):
         radial = self.__radial_vector()
         random_radius = np.random.uniform(0, self.radius**2, int(self.number))
         angles = np.random.uniform(0, 2*np.pi, int(self.number))
@@ -54,14 +54,14 @@ class LaserSource(Photons):
             self.wavelengths = np.array([self.profile]*int(self.number))
         else:
             self.wavelengths = self.profile.rvs(size=int(self.number))
-        if rate is None:
+        if time_window is None:
             self.t = None
         else:
-            if rate > 0:
-                time_spacing = (1 / rate) * 1e9
+            if time_window > 0:
+                time_spacing = time_window / self.number
                 self.t = np.arange(0, self.number*time_spacing, time_spacing)
-            elif (rate == 0) | (rate < 0):
-                raise ValueError(f"Photon rate {rate} must be greater than zero!")
+            elif (time_window == 0) | (time_window < 0):
+                raise ValueError(f"Photon rate {time_window} must be greater than zero!")
         
             
         super().__init__(self.pos, self.dir, self.pol, self.wavelengths, self.t)
