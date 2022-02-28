@@ -65,19 +65,14 @@ def double_exp_response(t, t0, A, amp_frac, short_tau, long_tau):
     return A * (exp_short + exp_long)
 
 
-class SiPM:
+class DetectorDevice(ABC):
 
-    def __init__(self, waveform_length, dt, hit_photons=None, dark_rate=800, cross_talk=0.3, afterpulse=1e-3):
+    def __init__(self, waveform_length, dt, hit_photons=None):
         self.hit_photons = hit_photons
         self.waveform_length = waveform_length
         self.dt = dt
-        self.dark_rate = dark_rate
-        self.cross_talk = cross_talk
-        self.afterpulse = afterpulse
         self.waves = None
         self.time = None
-        self.all_times = []
-        self.all_amps = []
 
     def init_waves(self, num_waveforms):
         self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
@@ -88,6 +83,35 @@ class SiPM:
         noise = np.random.normal(loc=0, scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=len(t))
         offset = np.random.normal(loc=0, scale=fwhm_offset/(2*np.sqrt(2*np.log(2))))
         return noise + offset
+
+    def generate_waveforms(self):
+        pass
+
+    def save_waveforms(self, output_path, channel_name=None, write_mode="w"):
+        if channel_name is None:
+            channel_name = "detector"
+        with h5py.File(output_path, write_mode) as h5_file:
+            h5_file.create_dataset(f"/raw/channels/{channel_name}/waveforms", data=self.waves)
+            h5_file.create_dataset(f"/raw/channels/{channel_name}/wf_len", data=self.waves.shape[1])
+            timetags = np.arange(0, self.waves.shape[0]*self.waveform_length, self.waveform_length)
+            if "timetag" not in h5_file.keys():
+                h5_file.create_dataset("timetag", data=timetags)
+            if "dt" not in h5_file.keys():
+                h5_file.create_dataset("dt", data=self.dt)
+            if "date" not in h5_file.keys():
+                h5_file.create_dataset("date", data=time.time())
+
+
+class SiPM(DetectorDevice):
+
+    def __init__(self, waveform_length, dt, hit_photons=None, dark_rate=800, cross_talk=0.3, afterpulse=1e-3):
+        self.dark_rate = dark_rate
+        self.cross_talk = cross_talk
+        self.afterpulse = afterpulse
+        self.all_times = []
+        self.all_amps = []
+
+        super(SiPM, self).__init__(waveform_length, dt, hit_photons)
 
     def add_dark_counts(self, sample_size=100, trigger=None):
         for i, waveform in enumerate(self.waves):
@@ -142,45 +166,24 @@ class SiPM:
             if noise:
                 self.waves[i] = np.add(self.waves[i], self.__baseline_noise(self.time, fwhm_noise, fwhm_offset))
 
-    def save_waveforms(self, output_path, channel_name=None):
-        if channel_name is None:
-            channel_name = "sipm"
-        with h5py.File(output_path, "w") as h5_file:
-            h5_file.create_dataset(f"/raw/channels/{channel_name}/waveforms", data=self.waves)
-            h5_file.create_dataset(f"/raw/channels/{channel_name}/wf_len", data=self.waves.shape[1])
-            timetags = np.arange(0, self.waves.shape[0]*self.waveform_length, self.waveform_length)
-            if "timetag" not in h5_file.keys():
-                h5_file.create_dataset("timetag", data=timetags)
-            if "dt" not in h5_file.keys():
-                h5_file.create_dataset("dt", data=self.dt)
-            if "date" not in h5_file.keys():
-                h5_file.create_dataset("date", data=time.time())
 
-
-class Photodiode:
+class Photodiode(DetectorDevice):
 
     def __init__(self, waveform_length, dt, hit_photons=None):
-        self.waveform_length = waveform_length
-        self.dt = dt
-        self.hit_photons = hit_photons
-        self.waves = None
-        self.time = None
+        super(Photodiode, self).__init__(waveform_length, dt, hit_photons)
 
-    def init_waves(self, num_waveforms):
-        self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
-        self.time = np.arange(0, int(self.waveform_length), self.dt)
-
-    def generate_waveforms(self, reponse=None, noise=True, fwhm_noise=1e-10):
+    def generate_waveforms(self, response=None, noise=True, fwhm_noise=1e-10, fwhm_offset=1e-10):
         if response is None:
             response = 23
-
+        if self.hit_photons is None:
+            raise ValueError("No hit_photons specified! Need hit_photons to calculate photocurrent!")
         hit_times = self.hit_photons.t
         hit_energies = const.h*const.c / self.hit_photons.wavelengths
         t0 = 0
         tf = self.waveform_length*self.dt
         for i, wave in enumerate(self.waves):
             if noise == True:
-                self.waves[i] += np.random.normal(scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=self.waveform_length)
+                self.wave[i] = self.__baseline_noise(self.time, fwhm_noise, fwhm_offset)
             local_hit_times = hit_times[(hit_times >= t0) & (hit_times < tf)]
             local_hit_energies = hit_energies[(hit_times >= t0) & (hit_times < tf)]
             if len(local_hit_times) == 0:
