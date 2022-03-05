@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 import math
-from tkinter import Scale
+import tqdm
 import h5py
 import time
 import numpy as np
@@ -108,6 +108,12 @@ class SiPM(DetectorDevice):
 
         super(SiPM, self).__init__(waveform_length, dt, hit_photons)
 
+    def init_waves(self, num_waveforms):
+        self.waves = np.zeros((num_waveforms, int(self.waveform_length / self.dt)), dtype=float)
+        self.time = np.arange(0, int(self.waveform_length), self.dt)
+        self.all_times = [[]]*self.waves.shape[0]
+        self.all_amps = [[]]*self.waves.shape[0]
+
     @staticmethod
     def __baseline_noise(t, fwhm_noise, fwhm_offset):
         noise = np.random.normal(loc=0, scale=fwhm_noise/(2*np.sqrt(2*np.log(2))), size=len(t))
@@ -121,7 +127,7 @@ class SiPM(DetectorDevice):
             if trigger is not None:
                 dark_times = np.insert(dark_times, 0, trigger)
             time_locs = np.cumsum(dark_times)
-            time_locs = time_locs[time_locs < self.time[-1]]
+            time_locs = time_locs[time_locs <= self.time[-1]]
             amplitudes = np.ones(len(time_locs))
             for j, time in enumerate(time_locs):
                 if amplitudes[j] >= 1:
@@ -132,14 +138,14 @@ class SiPM(DetectorDevice):
                         if dt is not None:
                             amplitudes = np.append(amplitudes, amp)
                             time_locs = np.append(time_locs, time_locs[j]+dt)
-            self.all_amps.append(amplitudes)
-            self.all_times.append(time_locs)
+            self.all_amps[i].append(np.array(amplitudes))
+            self.all_times[i].append(np.array(time_locs))
 
     def add_light_counts(self):
         time_window = self.waveform_length * self.dt
         offset = 0
         all_hit_times = self.hit_photons.t
-        for i, waveform in enumerate(self.waves.T):
+        for i, waveform in enumerate(self.waves):
             hit_times = all_hit_times[(all_hit_times >= offset) & (all_hit_times < offset + time_window)]
             amplitudes = np.ones(len(hit_times))
             offset += time_window
@@ -151,12 +157,12 @@ class SiPM(DetectorDevice):
                         amp, dt = afterpulse_generator(self.afterpulse, 100, 60)
                         if dt is not None:
                             amplitudes = np.append(amplitudes, amp)
-                            time_locs = np.append(hit_times, hit_times[j]+dt)
-                self.all_amps[j] = np.append(self.all_amps[j], amplitudes)
-                self.all_times[j] = np.append(self.all_times[j], hit_times)
+                            hit_times = np.append(hit_times, hit_times[j]+dt)
+            self.all_amps[i] = np.append(self.all_amps[i], amplitudes)
+            self.all_times[i] = np.append(self.all_times[i], hit_times)
 
     def generate_waveforms(self, response_func, noise=True, fwhm_pe=0.25, fwhm_noise=0.1, fwhm_offset=0.05):
-        for i, waveform in enumerate(self.waves):
+        for i, waveform in tqdm.tqdm(enumerate(self.waves), total=self.waves.shape[0]):
             for j, time in enumerate(self.all_times[i]):
                 amp = self.all_amps[i][j]
                 if noise & (amp >= 1):
@@ -179,7 +185,7 @@ class Photodiode(DetectorDevice):
         offset = np.random.normal(loc=0, scale=fwhm_offset/(2*np.sqrt(2*np.log(2))))
         return noise + offset
 
-    def generate_waveforms(self, response=None, noise=True, fwhm_noise=1e-20, fwhm_offset=0, scale=1e-14):
+    def generate_waveforms(self, response=None, noise=True, fwhm_noise=1e-20, fwhm_offset=0):
         if response is None:
             response = 23
         if self.hit_photons is None:
@@ -188,7 +194,7 @@ class Photodiode(DetectorDevice):
         hit_energies = const.h*const.c / (self.hit_photons.wavelengths*1e-9)
         t0 = 0
         tf = self.waveform_length
-        for i, wave in enumerate(self.waves):
+        for i, wave in tqdm.tqdm(enumerate(self.waves), total=self.waves.shape[0]):
             if noise == True:
                 self.waves[i] = self.__baseline_noise(self.time, fwhm_noise, fwhm_offset)
             local_hit_times = hit_times[(hit_times >= t0) & (hit_times < tf)]
@@ -198,6 +204,6 @@ class Photodiode(DetectorDevice):
                                      weights=local_hit_energies)
             if len(local_hit_times) == 0:
                 continue
-            self.waves[i] += n * response * scale
+            self.waves[i] += n * response
             t0 += self.waveform_length
             tf += self.waveform_length

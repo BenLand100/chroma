@@ -1,4 +1,3 @@
-from chroma.gpu.geometry import GPUGeometry
 from chroma.gpu.detector import GPUDetector
 from chroma.gpu.photon import GPUPhotons
 from chroma.gpu.tools import get_rng_states
