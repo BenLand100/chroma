@@ -138,8 +138,8 @@ class SiPM(DetectorDevice):
                         if dt is not None:
                             amplitudes = np.append(amplitudes, amp)
                             time_locs = np.append(time_locs, time_locs[j]+dt)
-            self.all_amps[i].append(np.array(amplitudes))
-            self.all_times[i].append(np.array(time_locs))
+            self.all_amps[i] = np.array(amplitudes)
+            self.all_times[i] = np.array(time_locs)
 
     def add_light_counts(self):
         time_window = self.waveform_length * self.dt
