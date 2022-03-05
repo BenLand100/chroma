@@ -63,7 +63,8 @@ def double_exp_response(t, t0, A, amp_frac, short_tau, long_tau):
     t_after = t[t >= t0]
     exp_short = (1 / (short_tau + amp_frac**-1*long_tau)) * np.exp(-(t_after - t0)/short_tau)
     exp_long = (1 / (short_tau*amp_frac + long_tau)) * np.exp(-(t_after-t0)/long_tau)
-    return A * (exp_short + exp_long)
+    start = np.zeros(len(t_before))
+    return np.concatenate((start, A * (exp_short + exp_long)))
 
 
 class DetectorDevice(ABC):
@@ -99,10 +100,11 @@ class DetectorDevice(ABC):
 
 class SiPM(DetectorDevice):
 
-    def __init__(self, waveform_length, dt, hit_photons=None, dark_rate=800, cross_talk=0.3, afterpulse=1e-3):
+    def __init__(self, waveform_length, dt, hit_photons=None, dark_rate=800, cross_talk=0.3, afterpulse=1e-3, pe_amp=1):
         self.dark_rate = dark_rate
         self.cross_talk = cross_talk
         self.afterpulse = afterpulse
+        self.pe_amp = pe_amp
         self.all_times = []
         self.all_amps = []
 
@@ -128,15 +130,15 @@ class SiPM(DetectorDevice):
                 dark_times = np.insert(dark_times, 0, trigger)
             time_locs = np.cumsum(dark_times)
             time_locs = time_locs[time_locs <= self.time[-1]]
-            amplitudes = np.ones(len(time_locs))
+            amplitudes = np.ones(len(time_locs)) * self.pe_amp
             for j, time in enumerate(time_locs):
                 if amplitudes[j] >= 1:
                     dict_number = cross_talk_generator(self.cross_talk)
-                    amplitudes[j] += dict_number
+                    amplitudes[j] += dict_number*self.pe_amp
                     for k in range(dict_number+1):
                         amp, dt = afterpulse_generator(self.afterpulse, 100, 60)
                         if dt is not None:
-                            amplitudes = np.append(amplitudes, amp)
+                            amplitudes = np.append(amplitudes, amp*self.pe_amp)
                             time_locs = np.append(time_locs, time_locs[j]+dt)
             self.all_amps[i] = np.array(amplitudes)
             self.all_times[i] = np.array(time_locs)
@@ -147,16 +149,16 @@ class SiPM(DetectorDevice):
         all_hit_times = self.hit_photons.t
         for i, waveform in enumerate(self.waves):
             hit_times = all_hit_times[(all_hit_times >= offset) & (all_hit_times < offset + time_window)]
-            amplitudes = np.ones(len(hit_times))
+            amplitudes = np.ones(len(hit_times)) * self.pe_amp
             offset += time_window
             for j, time in enumerate(hit_times):
                 if amplitudes[j] >= 1:
                     dict_number = cross_talk_generator(self.cross_talk)
-                    amplitudes[j] += dict_number
+                    amplitudes[j] += dict_number*self.pe_amp
                     for k in range(dict_number+1):
                         amp, dt = afterpulse_generator(self.afterpulse, 100, 60)
                         if dt is not None:
-                            amplitudes = np.append(amplitudes, amp)
+                            amplitudes = np.append(amplitudes, amp*self.pe_amp)
                             hit_times = np.append(hit_times, hit_times[j]+dt)
             self.all_amps[i] = np.append(self.all_amps[i], amplitudes)
             self.all_times[i] = np.append(self.all_times[i], hit_times)
